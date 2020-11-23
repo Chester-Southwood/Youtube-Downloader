@@ -12,7 +12,7 @@ Application function is to **download mp3 or mp4** of given **public url of play
 * **Compile**:
   * Download package dependencies locally using the following command.
   ```
-  program
+  npm install
   ```
   * If the js folder is empty, from the parent folder run using the following command to compile ts into js.
   ```
@@ -33,4 +33,4 @@ Application function is to **download mp3 or mp4** of given **public url of play
 -----
 ### **Bugs/TODOS**:
 * **BUG** 
-  * Error was found using a dependent library when attempting to retreive urls from a playlist with chinese characters. Some (not all) chinese/foreign characters can cause a exception to be thrown. A possible workaround is creating helper functions to use instead with cheerio to retrieve the urls instead. The owner of the library has been notified of the found issue.
+  * Error was found using a dependent library when attempting to retreive urls from a playlist, playlists that are over 100 videos throw a exception. A possible workaround is creating helper functions to use instead of library, using cheerio to retrieve the urls instead. The owner of the library has been notified of the found issue.
