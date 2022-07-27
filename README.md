@@ -17,15 +17,18 @@ Application function is to **download mp3 or mp4** of given **public url of play
   * If the js folder is empty, from the parent folder run using the following command to compile ts into js.
   ```
   tsc -p ./tsconfig.json
+  // tsc -w // Auto compiles after each change
   ```
 * **Use**:
   * Run program by using following command from home directory. 
   ```
   //for playlists
   node ./code/js/youtube-downloader.js -playlist "playlistURL" fileType directoryPath
-  
+
   //for single video
   node ./code/js/youtube-downloader.js -video    "videoURL"    fileType directoryPath 
+  
+  //Example -> node main.js -playlist "https://www.youtube.com/playlist?list=PLLgjzmK8avG9IDl2v1gJ2nT_teRuskqH9" mp4 playlist
   ```
   * **Folder structure** starts in pre-made "youtube-downloads" folder. Given directory path such as "./dir1/dir2" will create recursively the folder structure if it does not already exist and download files into "./youtube-downloads/dir1/dir".
 

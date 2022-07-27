@@ -1,101 +1,71 @@
 import * as fs from "fs";
-import scrapePlaylist from 'youtube-playlist-scraper';
+const ytpl = require('ytpl');
 import * as readline from "readline";
-import ytdl from 'ytdl-core';
+const ytdl = require('ytdl-core');
+const {removeForbiddenCharactersForFileName} = require('./fileHelper.js');
 
 interface PlaylistElement {
     url:string,
     videoName:string
 }
 
-async function downloadPlaylistViaUrl(url:string, fileType:string, directoryPath:string) {
-    const playlistId = url.split("www.youtube.com/playlist?list=")[1];
-    getPlaylist(playlistId).then(async (data) => {
-        console.log("\nPLAYLIST DOWNLOAD: STARTED")
-        for(var i = 0; i < data.playlist.length; i++) {
-            await downloadVideoByObj({url:data.playlist[i].id, videoName:data.playlist[i].name}, fileType, directoryPath)
-        }
-        console.log("\nPLAYLIST DOWNLOAD: COMPLETE")
-    });
+interface Streams {
+    streamRead: any,
+    streamWrite: fs.WriteStream
 }
   
-async function downloadVideo(url:string, videoName:string, fileType:string, directoryPath:string) {
-    await downloadVideoByObj({"url": url, "videoName": videoName}, fileType, directoryPath);
-}
-
-async function removeForbiddenCharactersForFileName(videoName:string) {
-    const forbiddenCharactersInFileNameArr = ["<", ">", ":", "\"", "/", "\\", "|", "?", "*", "."];
-    const originalVideoName = videoName;
-    forbiddenCharactersInFileNameArr.forEach((letter) => {
-        while(videoName.includes(letter)) {
-            console.log(`\nVideo with name \"${originalVideoName}\" contains invalid character \"${letter}\", replacing with \"_\"`)
-            videoName = videoName.replace(letter, "_");
-        }
-    });
-    return videoName;
-}
-
-async function downloadVideoByObj(PlaylistElement:PlaylistElement, fileType:string, directoryPath:string) {
+async function downloadVideo(PlaylistElement:PlaylistElement, fileType:string, directoryPath:string) {
     PlaylistElement.videoName = await removeForbiddenCharactersForFileName(PlaylistElement.videoName);
-    var stream;
-    if(fileType === 'mp3') {
-        var writeStream = fs.createWriteStream(`${directoryPath}/${PlaylistElement.videoName}.mp3`);
-        console.log(`\nSTARTED DOWNLOAD: " ${PlaylistElement.videoName}`)
-        stream = ytdl(PlaylistElement.url, { highWaterMark: 1 << 25, filter: 'audioonly' });
-        stream.pipe(writeStream);
-    } else {
-        var writeStream = fs.createWriteStream(`${directoryPath}/${PlaylistElement.videoName}.mp4`);
-        console.log(`\nSTARTED DOWNLOAD " ${PlaylistElement.videoName}`)
-        stream = ytdl(PlaylistElement.url, { quality: 'highestvideo', filter: 'videoandaudio' });
-        stream.pipe(writeStream);
-    }
-    stream.on('progress', (chunkLength, downloaded, total) => {
-        let percent = ((downloaded / total) * 100).toFixed(0);
+    const streams = generateDownloadStreams(directoryPath, PlaylistElement, fileType);
+    setupReadStream(streams.streamRead, PlaylistElement);
+
+    return createStreamDownloadPromise(streams.streamWrite);
+}
+
+function createStreamDownloadPromise(streamWrite: fs.WriteStream) {
+    return new Promise((resolve, reject) => {
+        streamWrite.on('finish', resolve);
+        streamWrite.on('error', reject);
+    });
+}
+
+function setupReadStream(stream: any, PlaylistElement: PlaylistElement): void {
+    stream.on('start', () => console.log(`\nSTARTED DOWNLOAD " ${PlaylistElement.videoName}`));
+
+    stream.on('progress', (_chunkLength: any, downloaded: number, total: number) => {
+        const percent = ((downloaded / total) * 100).toFixed(0);
         readline.cursorTo(process.stdout, 0);
         process.stdout.write(`Downloading: ${percent}%`);
     });
 
     stream.on('end', () => console.log(`\nSUCCESSFULLY DOWNLOADED: ${PlaylistElement.videoName}`));
-    
-    return new Promise((resolve, reject) => {
-        writeStream.on('finish', resolve);
-        writeStream.on('error', reject);
+}
+
+function generateDownloadStreams(directoryPath: string, playlistElement: PlaylistElement, fileType: string): Streams {
+    const writeStream = fs.createWriteStream(`${directoryPath}/${playlistElement.videoName}.${fileType}`);
+    const configurations = fileType === 'mp3' ? { quality: 'highestvideo', filter: 'videoandaudio' } : { quality: 'highestvideo', filter: 'videoandaudio' };
+    const stream = ytdl(playlistElement.url, configurations);
+    stream.pipe(writeStream);
+
+    return {streamRead: stream, streamWrite: writeStream};
+}
+
+async function getPlaylist(playlistId:string) {return await ytpl(playlistId);}
+
+export async function downloadPlaylistViaUrl(url:string, fileType:string, directoryPath:string) {
+    const playlistId = url.split("www.youtube.com/playlist?list=")[1];
+    getPlaylist(playlistId).then(async (data) => {
+        console.log("\nPLAYLIST DOWNLOAD: STARTED");
+        for(let i = 0; i < data.items.length; i++) {
+            await downloadVideo({url:data.items[i].id, videoName:data.items[i].title}, fileType, directoryPath)
+        }
+        console.log("\nPLAYLIST DOWNLOAD: COMPLETE");
     });
 }
-   
-async function getPlaylist(playlistId:string) {return await scrapePlaylist(playlistId);}
 
-async function main() {
-    var myArgs = process.argv.slice(2);
-    if(myArgs.length != 4) {
-        console.log("\nError: Invalid Number of arguments");
-        console.log("\nOPTIONS:")
-        console.log("node youtube-downloader.js -playlist playlistURL fileType directoryPath")
-        console.log("node youtube-downloader.js -video    videoURL    fileType directoryPath\n")
-    } else {
-        const flag      = myArgs[0];
-        const url       = myArgs[1];
-        const fileType  = myArgs[2];
-        const directory = `./youtube-downloads/${await removeForbiddenCharactersForFileName(myArgs[3])}`;
-        if (!fs.existsSync(directory)) {
-            fs.mkdirSync(directory, { recursive: true });
-        }
+export async function downloadVideoViaUrl(videoUrl:string, fileType:string, directoryPath:string) {
+    const videoObj = await ytdl.getInfo(videoUrl);
+    const videoName = videoObj.videoDetails.title;
 
-        switch(flag) {
-            case '-playlist':
-                downloadPlaylistViaUrl(url, fileType, directory);
-                break;
-            case '-video':
-                const videoObj = await ytdl.getInfo(url);
-                const videoTitle = videoObj.videoDetails.title;
-                downloadVideo(url, videoTitle, fileType, directory);
-                break;
-            default:
-                console.log("Error: Did not include valid flag.");
-                console.log("node youtube-downloader.js -playlist playlistURL fileType directoryName");
-                console.log("node youtube-downloader.js -video    videoURL fileType directoryName");
-        }     
-    }
+    downloadVideo({url:videoUrl, videoName:videoName}, fileType, directoryPath);
 }
-
-main();
