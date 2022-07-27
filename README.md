@@ -34,6 +34,8 @@ Application function is to **download mp3 or mp4** of given **public url of play
 
   * Be aware that **files that already exist** in the given url **will be overwritten** if contain the same file name as generated video(s).
 -----
-### **Bugs/TODOS**:
-* **BUG** 
+### **Bugs**:
   * Error was found using a dependent library when attempting to retreive urls from a playlist, playlists that are over 100 videos throw a exception. A possible workaround is creating helper functions to use instead of library, using cheerio to retrieve the urls instead. The owner of the library has been notified of the found issue.
+
+### **TODOs**:
+  * Create Webpage for convience to download as ZIP once finished with Udemy Angular course.
